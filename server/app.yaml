@@ -1,0 +1,42 @@
+# app.yaml — Databricks Apps runtime config.
+#
+# This is the entry point Databricks Apps uses to start the process. The app
+# listens on the injected $DATABRICKS_APP_PORT (always 8000 today). Because the
+# MCP server is mounted IN-CODE onto the same FastAPI app (see mcp_server.py),
+# there are NO MCP-specific keys here — MCP ships inside the normal app process.
+#
+# In your real Databricks App, point the command at your own serve module
+# (e.g. `app.serve:app`) once you add the `lifespan=` + `app.mount("/mcp", ...)`
+# lines shown in mcp_server.py. For this standalone demo it points at the demo module.
+
+# Start uvicorn via `sh -c` so the injected $DATABRICKS_APP_PORT is read at runtime
+# (Databricks Apps sets it — 8000 today); fall back to 8000 for local runs. `exec`
+# hands the process (and OS signals) directly to uvicorn.
+command:
+  - sh
+  - -c
+  - exec uvicorn server.mcp_server:app --host 0.0.0.0 --port "${DATABRICKS_APP_PORT:-8000}"
+
+# Enable user-authorization (On-Behalf-Of) if your tools must act as the
+# signed-in user for governed data. When enabled, the user token arrives in the
+# `x-forwarded-access-token` header (see _obo_user_token in mcp_server.py).
+#
+# Declare the user API scopes the forwarded token should carry via `user_api_scopes`.
+# Grant ONLY what the tools need and verify the exact scope names in the app's
+# Authorization UI. Example:
+#
+# user_api_scopes:
+#   - iam.current-user:read                   # who the signed-in user is
+#   - sql                                     # SQL warehouse / UC queries as the user
+#   - vectorsearch.vector-search-endpoints    # Vector Search as the user
+#
+# NOTE: M2M (client-credentials) is NOT OBO — it acts as the caller service principal
+# and never carries the signed-in user's identity. Only user_api_scopes +
+# x-forwarded-access-token give you OBO.
+#
+# Other non-secret settings go under `env:` e.g.
+# env:
+#   - name: SOME_SETTING
+#     value: "..."
+#
+# (No secrets in this file — use Databricks app resources / secrets for those.)

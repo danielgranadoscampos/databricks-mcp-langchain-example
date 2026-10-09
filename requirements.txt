@@ -1,0 +1,16 @@
+# Server-side dependencies for this example's custom MCP server.
+# Pinned to current, known-good versions (verified Oct 2026).
+
+# FastMCP streamable-HTTP server. Pinned to the EXACT version the working smoke +
+# live run used. Stay on 1.x: mcp 2.x renamed FastMCP -> MCPServer and moved the
+# import, which would break `from mcp.server.fastmcp import FastMCP`. The client's
+# langchain-mcp-adapters resolves to this same mcp 1.30.0, so the pins stay coherent.
+mcp==1.30.0
+
+# FastAPI + uvicorn: the app host. Databricks Apps serve on $DATABRICKS_APP_PORT.
+fastapi==0.142.1
+uvicorn==0.54.0
+
+# Used inside the tools to authenticate to the workspace (service principal via
+# WorkspaceClient(), or the OBO user token from x-forwarded-access-token).
+databricks-sdk==0.147.0

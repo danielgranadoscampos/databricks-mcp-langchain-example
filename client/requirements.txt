@@ -1,0 +1,31 @@
+# Client-side dependencies: the EXTERNAL LangChain/LangGraph agent.
+# Pinned to a co-installable set (verified Oct 2026).
+#
+# TIP: the langchain ecosystem's dependency graph is large; `uv pip install -r
+# client/requirements.txt` resolves it in seconds (the Databricks custom-MCP docs
+# also recommend uv). Plain `pip` works too but can be slow to resolve.
+
+# ChatDatabricks brain. databricks-langchain REPLACES the deprecated
+# langchain-databricks package.
+databricks-langchain==0.20.0
+
+# Loads MCP server tools as LangChain tools; supports the streamable_http
+# transport with custom Authorization headers.
+langchain-mcp-adapters==0.3.2
+
+# create_react_agent lives in langgraph.prebuilt. (In LangChain 1.x this is a
+# deprecated alias for langchain.agents.create_agent — both work.)
+langgraph==1.2.12
+
+# Pin unitycatalog-langchain (a databricks-langchain dependency) to 0.3.0. The
+# newer 0.4.0 caps langchain<=1.2.10, which pins langgraph<1.1.0 and conflicts
+# with langgraph==1.2.12; 0.3.0 leaves langchain/langgraph free to resolve.
+unitycatalog-langchain==0.3.0
+
+# Used to mint the OAuth M2M token (and by databricks-langchain under the hood).
+databricks-sdk==0.147.0
+requests==2.32.5
+
+# Optional: load a local .env file. The client works without it (it reads the
+# process environment directly) but this makes `cp .env.example .env` convenient.
+python-dotenv==1.2.3

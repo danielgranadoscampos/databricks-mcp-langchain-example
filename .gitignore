@@ -1,0 +1,21 @@
+# Never commit real secrets / local env.
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv*/
+venv*/
+*.smoke-venv/
+*.egg-info/
+.pytest_cache/
+
+# Databricks CLI / deploy state & local credential artifacts
+.databricks/
+.databrickscfg
+*.token
+
+# Cross-review artifacts
+.polly/

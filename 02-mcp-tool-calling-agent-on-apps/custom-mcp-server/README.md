@@ -87,9 +87,12 @@ Put that URL in the agent's `CUSTOM_MCP_SERVER_URL` (see [`../.env.example`](../
 - **OAuth, not PAT, at the front door.** M2M callers (like the agent's service
   principal) must have `CAN_USE` on this app; a legacy PAT is rejected by the
   Apps front door. Get an OAuth token with `databricks auth token -p <profile>`.
-- **OBO** needs user authorization enabled on the app plus `user_api_scopes` in
-  [`app.yaml`](app.yaml); the user token then arrives in
-  `x-forwarded-access-token`.
+- **OBO is opt-in and off by default.** The sample tools return static data and
+  need no workspace scopes, so no `user_api_scopes` are requested.
+  `get_pending_approvals` still demonstrates the OBO wiring (it reads the
+  forwarded user token). To enable the real OBO path, turn on user authorization
+  and uncomment the `user_api_scopes` block in [`app.yaml`](app.yaml); the user
+  token then arrives in `x-forwarded-access-token`.
 
 ## Reference
 

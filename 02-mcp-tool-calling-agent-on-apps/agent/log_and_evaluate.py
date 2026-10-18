@@ -67,9 +67,12 @@ def log_model():
 def evaluate():
     """Evaluate the agent with Mosaic AI Agent Evaluation (predefined LLM judges)."""
     from mlflow.genai.scorers import RelevanceToQuery, Safety
+    from mlflow.types.responses import ResponsesAgentRequest
 
     from agent import AGENT
 
+    # Each row's `inputs` dict is splatted as kwargs into predict_fn, so predict_fn
+    # receives `input=[...]`.
     eval_dataset = [
         {
             "inputs": {
@@ -83,9 +86,15 @@ def evaluate():
         },
     ]
 
+    def predict_fn(input):
+        # ResponsesAgent.predict expects a ResponsesAgentRequest (it reads
+        # request.input / request.custom_inputs) — NOT a plain dict.
+        request = ResponsesAgentRequest(input=input)
+        return AGENT.predict(request).model_dump()
+
     results = mlflow.genai.evaluate(
         data=eval_dataset,
-        predict_fn=lambda input: AGENT.predict({"input": input}),
+        predict_fn=predict_fn,
         scorers=[RelevanceToQuery(), Safety()],
     )
     print("Evaluation complete — review results in the MLflow UI.")

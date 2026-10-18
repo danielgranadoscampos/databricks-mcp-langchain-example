@@ -14,11 +14,22 @@ command:
 # config. Non-secret settings would go under `env:`; secrets belong in app
 # resources / Databricks secrets, never in this file.
 #
-# OBO (on-behalf-of-user): the demo tools work as the app service principal.
-# To let a tool act AS THE SIGNED-IN USER for governed data, enable user
-# authorization on the app and declare ONLY the scopes the tools need. The
-# user's token then arrives in the `x-forwarded-access-token` header
-# (see _obo_user_token in app.py). Example:
+# ---------------------------------------------------------------------------
+# OBO (on-behalf-of-user) is OPT-IN and is intentionally OFF in this demo.
+#
+# WHY OFF BY DEFAULT: the sample tools return only static, fictional data, so
+# they call NO governed workspace resource and therefore need NO user scopes.
+# Requesting scopes the tools don't use would violate least privilege, so
+# `user_api_scopes` is deliberately omitted here. `get_pending_approvals` still
+# DEMONSTRATES the OBO wiring — it reads the forwarded user token and reports
+# which identity it ran under (see _obo_user_token in app.py) — without touching
+# any governed data, which is why it works with no scopes declared.
+#
+# TO ENABLE THE REAL OBO PATH (act AS THE SIGNED-IN USER against governed data):
+#   1. Turn on user authorization for this app in its Authorization settings.
+#   2. Uncomment the `user_api_scopes` block below and keep ONLY the scopes your
+#      real tool bodies use. The user's token then arrives in the
+#      `x-forwarded-access-token` header.
 #
 # user_api_scopes:
 #   - iam.current-user:read                   # who the signed-in user is
@@ -28,3 +39,4 @@ command:
 # NOTE: M2M (client-credentials) is NOT OBO — it acts as the caller service
 # principal and never carries the signed-in user's identity. Only
 # user_api_scopes + x-forwarded-access-token give you OBO.
+# ---------------------------------------------------------------------------

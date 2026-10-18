@@ -25,6 +25,12 @@ Prereq for the Vector Search step:  %pip install databricks-vectorsearch
 from __future__ import annotations
 
 import os
+import re
+
+# Unity Catalog / endpoint names must be simple identifiers. Validating up front
+# means a bad name fails clearly AND cannot be interpolated into SQL to alter it.
+_IDENT_RE = re.compile(r"^[A-Za-z0-9_]+$")
+_ENDPOINT_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _param(name: str, default: str) -> str:
@@ -35,14 +41,41 @@ def _param(name: str, default: str) -> str:
         return os.getenv(name.upper(), default)
 
 
+def _validate_identifier(value: str, kind: str, pattern: re.Pattern = _IDENT_RE) -> str:
+    """Reject anything that is not a simple identifier (defends the SQL below)."""
+    if not value or not pattern.match(value):
+        raise ValueError(
+            f"Invalid {kind} {value!r}: use only letters, digits, underscores"
+            + (" or hyphens." if pattern is _ENDPOINT_RE else ".")
+        )
+    return value
+
+
+def _vs_endpoint_exists(client, name: str) -> bool:
+    try:
+        client.get_endpoint(name)
+        return True
+    except Exception:
+        return False
+
+
+def _vs_index_exists(client, index_name: str) -> bool:
+    try:
+        client.get_index(index_name=index_name)
+        return True
+    except Exception:
+        return False
+
+
 def create_uc_function(catalog: str, schema: str) -> None:
     """Create a keyless UC Python function (exposed via the UC Functions managed MCP)."""
-    spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog}")  # noqa: F821
-    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")  # noqa: F821
+    # Identifiers are validated by main(); backtick-quote them as defense in depth.
+    spark.sql(f"CREATE CATALOG IF NOT EXISTS `{catalog}`")  # noqa: F821
+    spark.sql(f"CREATE SCHEMA IF NOT EXISTS `{catalog}`.`{schema}`")  # noqa: F821
 
     spark.sql(  # noqa: F821
         f"""
-        CREATE OR REPLACE FUNCTION {catalog}.{schema}.annualized_growth_rate(
+        CREATE OR REPLACE FUNCTION `{catalog}`.`{schema}`.annualized_growth_rate(
             start_value DOUBLE COMMENT 'Value at the start of the period',
             end_value DOUBLE COMMENT 'Value at the end of the period',
             years INT COMMENT 'Number of years in the period'
@@ -116,42 +149,58 @@ SAMPLE_DOCS = [
 
 
 def create_vector_search_index(catalog: str, schema: str, vs_endpoint: str, embedding_model: str) -> None:
-    """Create a sample-docs table + a Vector Search delta-sync index over it."""
+    """Create a sample-docs table + a Vector Search delta-sync index over it (idempotent)."""
     source_table = f"{catalog}.{schema}.policy_docs"
     index_name = f"{catalog}.{schema}.policy_docs_index"
 
+    # `overwrite` + `ALTER ... SET TBLPROPERTIES` are both idempotent on re-run.
     df = spark.createDataFrame(SAMPLE_DOCS, ["chunk_id", "title", "chunk_text", "doc_uri"])  # noqa: F821
     df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(source_table)
     # Vector Search delta-sync indexes require Change Data Feed on the source table.
-    spark.sql(f"ALTER TABLE {source_table} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)")  # noqa: F821
+    spark.sql(  # noqa: F821
+        f"ALTER TABLE `{catalog}`.`{schema}`.policy_docs "
+        "SET TBLPROPERTIES (delta.enableChangeDataFeed = true)"
+    )
     print(f"Created source table {source_table}")
 
     from databricks.vector_search.client import VectorSearchClient
 
     client = VectorSearchClient()
-    # Create the endpoint if it does not already exist.
-    try:
-        client.create_endpoint(name=vs_endpoint)
-    except Exception as e:  # noqa: BLE001 — typically "already exists"
-        print(f"(endpoint note: {e})")
 
-    client.create_delta_sync_index(
-        endpoint_name=vs_endpoint,
-        source_table_name=source_table,
-        index_name=index_name,
-        pipeline_type="TRIGGERED",
-        primary_key="chunk_id",
-        embedding_source_column="chunk_text",
-        embedding_model_endpoint_name=embedding_model,
-        columns_to_sync=["title", "chunk_text", "doc_uri"],
-    )
-    print(f"Created Vector Search index {index_name} on endpoint {vs_endpoint}")
+    # Create the endpoint only if it is not already there. We no longer swallow
+    # every exception as "already exists" — a genuine create failure (auth,
+    # quota, config) now surfaces, because create runs only when the endpoint is
+    # confirmed absent.
+    if _vs_endpoint_exists(client, vs_endpoint):
+        print(f"Vector Search endpoint {vs_endpoint} already exists — reusing.")
+    else:
+        client.create_endpoint(name=vs_endpoint)
+        print(f"Created Vector Search endpoint {vs_endpoint}")
+
+    # Create the index only if it does not already exist, so a second run of this
+    # script succeeds cleanly instead of failing on the existing index.
+    if _vs_index_exists(client, index_name):
+        print(f"Vector Search index {index_name} already exists — reusing.")
+    else:
+        client.create_delta_sync_index(
+            endpoint_name=vs_endpoint,
+            source_table_name=source_table,
+            index_name=index_name,
+            pipeline_type="TRIGGERED",
+            primary_key="chunk_id",
+            embedding_source_column="chunk_text",
+            embedding_model_endpoint_name=embedding_model,
+            columns_to_sync=["title", "chunk_text", "doc_uri"],
+        )
+        print(f"Created Vector Search index {index_name} on endpoint {vs_endpoint}")
 
 
 def main() -> None:
-    catalog = _param("catalog", "main")
-    schema = _param("schema", "agent_demo")
-    vs_endpoint = _param("vs_endpoint", "agent_demo_vs_endpoint")
+    catalog = _validate_identifier(_param("catalog", "main"), "catalog")
+    schema = _validate_identifier(_param("schema", "agent_demo"), "schema")
+    vs_endpoint = _validate_identifier(
+        _param("vs_endpoint", "agent_demo_vs_endpoint"), "vs_endpoint", _ENDPOINT_RE
+    )
     embedding_model = _param("embedding_model", "databricks-gte-large-en")
 
     create_uc_function(catalog, schema)

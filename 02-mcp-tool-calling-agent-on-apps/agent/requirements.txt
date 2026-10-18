@@ -1,0 +1,42 @@
+# Dependencies for the agent Databricks App.
+# Pinned to a coherent, co-installable set that was installed together AND
+# import-verified (Oct 2026) — not merely metadata-resolved.
+
+# MLflow 3 — ResponsesAgent authoring interface + tracing (mlflow.langchain.autolog).
+mlflow==3.17.1
+
+# ChatDatabricks (the agent's LLM) + Databricks LangChain integration.
+databricks-langchain==0.20.0
+
+# MCP client used for BOTH managed and custom Databricks MCP servers.
+# DatabricksMCPClient adapts to the installed `mcp` major version; we hold it on
+# the mcp 1.x branch (see the mcp pin below).
+databricks-mcp==0.9.2
+
+# LangGraph graph runtime (tool-calling loop). langchain / langchain-core resolve
+# transitively (langchain 1.x).
+langgraph==1.2.12
+
+# IMPORTANT: hold `mcp` on 1.x. databricks-mcp alone would float `mcp` to 2.x, but
+# langchain-mcp-adapters (pulled by databricks-langchain) imports
+# `mcp.shared.context.RequestContext`, which exists only in mcp 1.x — so an
+# mcp-2.x set installs but FAILS to import. These two pins keep it on the proven
+# mcp 1.30.0 line (the same mcp/adapters versions example 01 uses).
+mcp==1.30.0
+langchain-mcp-adapters==0.3.2
+
+# Pin unitycatalog-langchain to 0.3.0: newer releases cap langchain in a way that
+# conflicts with langgraph==1.2.12 (same constraint as example 01's client).
+unitycatalog-langchain==0.3.0
+
+# The app host. Databricks Apps serve on $DATABRICKS_APP_PORT.
+fastapi==0.142.1
+uvicorn==0.54.0
+
+# Load a local .env during development (harmless in the deployed app).
+python-dotenv==1.2.3
+
+# NOTE: the optional evaluation harness (log_and_evaluate.py) additionally needs
+# `databricks-agents` (e.g. ==1.12.0) for the mlflow.genai scorers/simulator. It
+# is intentionally NOT required to run the agent, so it is left out here — see
+# the header of log_and_evaluate.py.

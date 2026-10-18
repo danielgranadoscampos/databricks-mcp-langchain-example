@@ -1,0 +1,36 @@
+# app.yaml — Databricks Apps runtime config for the agent.
+#
+# Databricks Apps injects $DATABRICKS_APP_PORT (8000 today). Start uvicorn via
+# `sh -c` so the port is read at runtime; `exec` hands the process (and signals)
+# to uvicorn. The entrypoint is `app:app` (the FastAPI instance in app.py),
+# because this folder is the deployed app root.
+command:
+  - sh
+  - -c
+  - exec uvicorn app:app --host 0.0.0.0 --port "${DATABRICKS_APP_PORT:-8000}"
+
+# Non-secret configuration (see config.py). DATABRICKS_HOST / DATABRICKS_CLIENT_ID
+# / DATABRICKS_CLIENT_SECRET are injected by the Apps runtime — do NOT set them
+# here. Fill in the values below for your workspace; blanks are treated as
+# "unset" and the matching MCP server is simply skipped.
+env:
+  - name: LLM_ENDPOINT_NAME
+    value: "databricks-claude-sonnet-5-5"
+  - name: UC_CATALOG
+    value: ""                 # TODO: your Unity Catalog catalog, e.g. "main"
+  - name: UC_SCHEMA
+    value: ""                 # TODO: your schema, e.g. "agent_demo"
+  - name: GENIE_SPACE_ID
+    value: ""                 # TODO: your Genie space id (optional)
+  - name: CUSTOM_MCP_SERVER_URL
+    value: ""                 # TODO: https://mcp-...-<id>.<region>.databricksapps.com/mcp/
+  # - name: SYSTEM_PROMPT
+  #   value: "You are ..."    # optional override of the default prompt
+
+# OBO (optional): to have the agent call governed data AS THE SIGNED-IN USER,
+# enable user authorization on the app and declare ONLY the scopes you need.
+# user_api_scopes:
+#   - iam.current-user:read
+#   - sql
+#   - vectorsearch.vector-search-endpoints
+#   - dashboards.genie

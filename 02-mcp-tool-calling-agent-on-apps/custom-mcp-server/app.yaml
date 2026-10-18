@@ -1,0 +1,42 @@
+# app.yaml — Databricks Apps runtime config for the custom MCP server.
+#
+# Databricks Apps starts this process and injects $DATABRICKS_APP_PORT (8000
+# today). We start uvicorn via `sh -c` so the port is read at runtime (and we
+# fall back to 8000 for local runs). `exec` hands the process — and OS signals —
+# directly to uvicorn. The entrypoint is `app:app` (the FastAPI instance named
+# `app` in app.py), because this folder is itself the deployed app root.
+command:
+  - sh
+  - -c
+  - exec uvicorn app:app --host 0.0.0.0 --port "${DATABRICKS_APP_PORT:-8000}"
+
+# This server returns only fictional sample data, so it needs no secrets and no
+# config. Non-secret settings would go under `env:`; secrets belong in app
+# resources / Databricks secrets, never in this file.
+#
+# ---------------------------------------------------------------------------
+# OBO (on-behalf-of-user) is OPT-IN and is intentionally OFF in this demo.
+#
+# WHY OFF BY DEFAULT: the sample tools return only static, fictional data, so
+# they call NO governed workspace resource and therefore need NO user scopes.
+# Requesting scopes the tools don't use would violate least privilege, so
+# `user_api_scopes` is deliberately omitted here. `get_pending_approvals` still
+# DEMONSTRATES the OBO wiring — it reads the forwarded user token and reports
+# which identity it ran under (see _obo_user_token in app.py) — without touching
+# any governed data, which is why it works with no scopes declared.
+#
+# TO ENABLE THE REAL OBO PATH (act AS THE SIGNED-IN USER against governed data):
+#   1. Turn on user authorization for this app in its Authorization settings.
+#   2. Uncomment the `user_api_scopes` block below and keep ONLY the scopes your
+#      real tool bodies use. The user's token then arrives in the
+#      `x-forwarded-access-token` header.
+#
+# user_api_scopes:
+#   - iam.current-user:read                   # who the signed-in user is
+#   - sql                                     # SQL warehouse / UC queries as the user
+#   - vectorsearch.vector-search-endpoints    # Vector Search as the user
+#
+# NOTE: M2M (client-credentials) is NOT OBO — it acts as the caller service
+# principal and never carries the signed-in user's identity. Only
+# user_api_scopes + x-forwarded-access-token give you OBO.
+# ---------------------------------------------------------------------------

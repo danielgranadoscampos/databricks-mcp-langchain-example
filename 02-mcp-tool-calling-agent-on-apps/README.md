@@ -106,6 +106,11 @@ and `schema` widgets (or `UC_CATALOG` / `UC_SCHEMA` env vars). It creates a UC
 function and a Vector Search index over inline sample documents — no internal
 tables, no API keys. Note the catalog/schema it prints.
 
+> The **catalog must already exist** — the script creates only the schema (you
+> need `USE CATALOG` + `CREATE SCHEMA` on the target catalog). It does not try to
+> create the catalog, since `CREATE CATALOG IF NOT EXISTS` requires the
+> metastore-level `CREATE CATALOG` privilege even when the catalog is present.
+
 ### 2. (Optional) Create a Genie space
 
 In the workspace, create a Genie space over your sales/customer tables and copy

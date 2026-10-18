@@ -69,8 +69,12 @@ def _vs_index_exists(client, index_name: str) -> bool:
 
 def create_uc_function(catalog: str, schema: str) -> None:
     """Create a keyless UC Python function (exposed via the UC Functions managed MCP)."""
-    # Identifiers are validated by main(); backtick-quote them as defense in depth.
-    spark.sql(f"CREATE CATALOG IF NOT EXISTS `{catalog}`")  # noqa: F821
+    # The catalog must ALREADY EXIST. We deliberately do NOT create it: on a
+    # shared catalog like `main`, `CREATE CATALOG IF NOT EXISTS` still requires
+    # CREATE CATALOG on the metastore and fails with PERMISSION_DENIED for most
+    # users. Creating the schema only needs USE CATALOG + CREATE SCHEMA on the
+    # target catalog. Identifiers are validated by main(); backtick-quote them
+    # as defense in depth.
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS `{catalog}`.`{schema}`")  # noqa: F821
 
     spark.sql(  # noqa: F821
